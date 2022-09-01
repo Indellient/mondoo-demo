@@ -20,8 +20,8 @@ resource "aws_s3_bucket" "all" {
   object_lock_enabled = true
   force_destroy       = true
   tags = {
-    "Mondoo" = "Compliant"
-    "Pwd"    = "s3"
+    "Mondoo"   = "Compliant"
+    "TFModule" = "_s3"
   }
 }
 
