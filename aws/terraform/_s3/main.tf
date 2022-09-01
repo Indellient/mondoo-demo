@@ -1,5 +1,3 @@
-data "aws_caller_identity" "current" {}
-
 variable "bucket_acl_map" {
   type = map(any)
   default = {
@@ -13,7 +11,7 @@ resource "aws_s3_bucket" "all" {
   object_lock_enabled = true
   force_destroy       = true
   tags = {
-    "Mondoo"   = "Compliant"
+    "Mondoo"   = "Non-compliant"
     "TFModule" = "_s3"
   }
 }
