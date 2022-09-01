@@ -1,0 +1,925 @@
+owner_mrn: //policy.api.mondoo.app
+policies:
+- uid: amazon-web-services-operational-best-practices-s3
+  name: Amazon Web Services (AWS) Operational Best Practices For S3
+  version: 1.0.0
+  is_public: true
+  authors:
+  - name: Mondoo Inc
+    email: hello@mondoo.com
+  docs:
+    desc: |-
+      This policy is based off of the AWS Operational Best Practices for S3, which is a collection of AWS Config rules for S3.
+
+      **References**
+
+      - [Operational Best Practices for S3](https://docs.aws.amazon.com/config/latest/developerguide/operational-best-practices-for-amazon-s3.html)
+  props:
+    s3AccountLevelPublicAccessBlocksBlockPublicAcls:
+    s3AccountLevelPublicAccessBlocksBlockPublicPolicy:
+    s3AccountLevelPublicAccessBlocksIgnorePublicAcls:
+    s3AccountLevelPublicAccessBlocksRestrictPublicBuckets:
+  specs:
+  - asset_filter:
+      query: |
+        platform.name == "aws"
+        platform.kind == "api"
+    scoring_queries:
+      aws-operational-best-practices-s3-account-level-public-access-blocks:
+      aws-operational-best-practices-s3-bucket-default-lock-enabled:
+      aws-operational-best-practices-s3-bucket-logging-enabled:
+      aws-operational-best-practices-s3-bucket-public-read-prohibited:
+      aws-operational-best-practices-s3-bucket-public-write-prohibited:
+      aws-operational-best-practices-s3-bucket-server-side-encryption-enabled:
+      aws-operational-best-practices-s3-bucket-versioning-enabled:
+      aws-operational-best-practices-s3-default-encryption-kms:
+props:
+  - uid: s3AccountLevelPublicAccessBlocksBlockPublicAcls
+    title: Denotes whether public acls should be blocked
+    query: true
+  - uid: s3AccountLevelPublicAccessBlocksBlockPublicPolicy
+    title: Denotes whether public policies should be blocked
+    query: true
+  - uid: s3AccountLevelPublicAccessBlocksIgnorePublicAcls
+    title: Denotes whether public acls should be ignored
+    query: true
+  - uid: s3AccountLevelPublicAccessBlocksRestrictPublicBuckets
+    title: Denotes whether public buckets should be blocked
+    query: true
+queries:
+- uid: aws-operational-best-practices-s3-account-level-public-access-blocks
+  title: Checks if the required S3 public access block settings are configured from account level
+  severity: 30
+  docs:
+    desc: |
+      Amazon S3 Block Public Access provides settings for access points, buckets, and accounts to help you manage public access to Amazon S3 resources. By default, new buckets, access points, and objects do not allow public access.
+    audit: |
+      __Mondoo Shell__
+
+      1. Open a Terminal.
+      2. Connect Mondoo Shell to your AWS environment `mondoo shell -t aws`
+      3. Run the following query 
+      
+      ```mql
+      aws.s3control.accountPublicAccessBlock
+      ```
+
+      Example output
+
+      ```mql
+      aws.s3control.accountPublicAccessBlock: null
+      ```
+    remediation: |
+      
+      __Terraform__
+
+      The following Terraform resource configures account level access to S3.
+
+      ```hcl
+      resource "aws_s3_account_public_access_block" "s3_control" {
+        block_public_acls       = true
+        block_public_policy     = true
+        ignore_public_acls      = true
+        restrict_public_buckets = true
+      }
+      ```
+    
+      __AWS Console__
+
+      To edit block public access settings for all the S3 buckets in an AWS account.
+      
+      1. Sign in to the AWS Management Console and open the Amazon S3 console at https://console.aws.amazon.com/s3/.
+      2. Choose Block Public Access settings for this account.
+      3. Choose Edit to change the block public access settings for all the buckets in your AWS account.
+      4. Choose the settings that you want to change, and then choose Save changes.
+      5. When you're asked for confirmation, enter confirm. Then choose Confirm to save your changes.
+
+      __AWS CLI__
+
+      ```bash
+      aws s3control put-public-access-block \
+      --account-id <value> \
+      --public-access-block-configuration '{"BlockPublicAcls": true, "BlockPublicPolicy": true, "IgnorePublicAcls": true, "RestrictPublicBuckets": true}'
+      ```
+
+  refs:
+    - title: Blocking public access to your Amazon S3 storage
+      url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html
+    - title: Configuring block public access settings for your account
+      url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/configuring-block-public-access-account.html  
+  query: |
+    aws.s3control.accountPublicAccessBlock.values.all( _ == true )
+- uid: aws-operational-best-practices-s3-bucket-default-lock-enabled
+  title: Checks if each bucket has default lock enabled
+  severity: 30
+  docs: 
+    desc: |
+      AWS S3 Object Lock can help prevent objects from being deleted or overwritten for a fixed amount of time or indefinitely. Object Lock can be used to help meet regulatory requirements that require WORM storage, or add an extra layer of protection against object changes and deletion.
+    audit: |
+     __Mondoo Shell__
+
+      1. Open a Terminal.
+      2. Connect Mondoo Shell to your AWS environment `mondoo shell -t aws`
+      3. Run the following query 
+      
+         ```mql
+         aws.s3.buckets.where( defaultLock != "Enabled" ) { name arn tags defaultLock }
+         ```
+
+        Example output
+
+        ```mql
+        aws.s3.buckets.where: [
+          0: {
+            name: "12344375555-my-bucket"
+            tags: {
+              Environment: "12344375555-mondoo-demo"
+              Name: "12344375555-my-bucket"
+              git_file: "terraform/aws/s3.tf"
+              git_repo: "mondoo-demo-environment"
+            }
+            arn: "arn:aws:s3:::12344375555-my-bucket"
+            defaultLock: ""
+          }
+        ]
+        ```
+    remediation: |
+      AWS does not support changing the Object Lock Configuration on an existing bucket. Therefore in order to remediate this control, it is necessary to create a new compliant bucket and migrate the data.
+
+      See [How can I copy all objects from one Amazon S3 bucket to another bucket](https://aws.amazon.com/premiumsupport/knowledge-center/move-objects-s3-bucket/) to learn how to migrate your data from a non-compliant bucket to a compliant one.
+
+      __Terraform__
+
+      ```hcl
+      resource "aws_s3_bucket" "example" {
+        bucket              = "example-object-lock-bucket"
+        object_lock_enabled = true
+      }
+
+      resource "aws_s3_bucket_versioning" "example" {
+        bucket   = aws_s3_bucket.example.id
+        versioning_configuration {
+          status = "Enabled"
+        }
+      }
+
+      resource "aws_s3_bucket_acl" "example" {
+        bucket   = aws_s3_bucket.example.id
+        acl      = "private"
+      }
+      ```
+
+      __AWS Console__
+
+      To use S3 Object Lock, follow these basic steps:
+      
+      1. Create a new bucket with Object Lock enabled.
+      2. Configure a default retention period for objects placed in the bucket.
+      3. Place the objects that you want to lock in the bucket.
+      4. Apply a retention period, a legal hold, or both, to the objects that you want to protect.
+      5. Before you lock any objects, you have to enable a bucket to use S3 Object Lock. You enable Object Lock when you create a bucket. After you enable Object Lock on a bucket, you can lock objects in that bucket. When you create a bucket with Object Lock enabled, you can't disable Object Lock or suspend versioning for that bucket.
+      
+      For information about creating a bucket with S3 Object Lock enabled, see Creating a bucket.
+
+      To enable Object Lock legal hold
+      
+      1. Sign in to the AWS Management Console and open the Amazon S3 console at https://console.aws.amazon.com/s3/.
+      2. In the Buckets list, choose the name of the bucket that you want.
+      3. In the Objects list, choose the name of the object that you want to enable or disable legal hold for.
+      4. The Object overview opens, displaying the properties for your object.
+      5. Under Object Lock legal hold, choose Edit.
+      6. Under Legal hold, choose Enable or Disable.
+      7. Choose Save changes.
+
+      To edit Object Lock retention settings
+
+      1. In the Objects list, choose the name of the object that you want to edit Object Lock retention settings for.
+      2. The Object overview opens, displaying the properties for your object.
+      3. Under Object Lock retention, choose Edit.
+      4. Under Retention, choose Enable or Disable.
+      5. Under Retention mode, choose Governance mode or Compliance mode.
+      6. In the Retain until date box, enter the date when the object is no longer protected by the chosen retention mode.
+      7. Choose Save changes.
+
+      __AWS CLI__
+
+      ```bash
+      aws s3control create-bucket \
+      --bucket <bucket_name> \
+      --acl private \
+      --object-lock-enabled-for-bucket
+
+      aws s3api put-bucket-versioning \
+      --bucket <bucket_name> |
+      --versioning-configuration "Status=Enable"
+      ```
+
+  refs:
+    - title: AWS Documentation - Configuring S3 Object Lock using the console
+      url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock-console.html
+    - title: AWS Documentation - How S3 Object Lock works 
+      url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock-overview.html
+    - title: Managing Object Lock
+      url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock-managing.html
+    - title: Terraform Registry - aws_s3_bucket
+      url: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket
+    - title: How can I copy all objects from one Amazon S3 bucket to another bucket
+      url: https://aws.amazon.com/premiumsupport/knowledge-center/move-objects-s3-bucket/) to learn how to migrate your data from a non-compliant bucket to a compliant one
+  query: |
+    # @msg Found ${length} S3 buckets where default lock is not enabled:
+    # 
+    # ${{ name arn tags defaultLock }}      
+    aws.s3.buckets.all(defaultLock == "Enabled")
+- uid: aws-operational-best-practices-s3-bucket-logging-enabled
+  title: Checks if logging is enabled on all buckets
+  severity: 30
+  docs: 
+    desc: |
+      AWS S3 Server Access Logging feature records access requests to storage buckets which is useful for security audits. By default, server access logging is not enabled for S3 buckets.
+    audit: |
+     __Mondoo Shell__
+
+      1. Open a Terminal.
+      2. Connect Mondoo Shell to your AWS environment `mondoo shell -t aws`
+      3. Run the following query 
+      
+         ```mql
+        aws.s3.buckets.where(
+          logging.length == 0 
+        ) { name arn tags logging }
+         ```
+
+        Example output
+
+        ```mql
+        aws.s3.buckets.where: [
+          0: {
+            tags: {
+              Environment: "12344375555-mondoo-demo"
+              Name: "12344375555-my-bucket"
+              git_file: "terraform/aws/s3.tf"
+              git_repo: "mondoo-demo-environment"
+            }
+            arn: "arn:aws:s3:::12344375555-my-bucket"
+            logging: {}
+            name: "12344375555-my-bucket"
+          }
+        ]
+        ```
+    remediation: |
+      __Terraform__
+
+      The following example demonstrates how to create 2 buckets:
+
+      1. A logging bucket
+      2. A compliant bucket
+
+      ```hcl
+      variable "bucket_acl_map" {
+        type = map(any)
+        default = {
+          "logging-bucket"   = "log-delivery-write"
+          "compliant-bucket" = "private"
+        }
+      }
+
+      resource "aws_s3_bucket" "all" {
+        for_each            = var.bucket_acl_map
+        bucket              = each.key
+        object_lock_enabled = true
+        tags = {
+          "Mondoo" = "Compliant"
+          "Pwd"    = "s3"
+        }
+      }
+
+      resource "aws_s3_bucket_acl" "private" {
+        for_each = var.bucket_acl_map
+        bucket   = each.key
+        acl      = each.value
+      }
+
+      resource "aws_s3_bucket_versioning" "enabled" {
+        for_each = var.bucket_acl_map
+        bucket   = each.key
+        versioning_configuration {
+          status = "Enabled"
+        }
+      }
+
+      resource "aws_s3_bucket_logging" "enabled" {
+        for_each      = var.bucket_acl_map
+        bucket        = each.key
+        target_bucket = aws_s3_bucket.all["logging-bucket"].id
+        target_prefix = "log/"
+      }
+
+      resource "aws_s3_bucket_server_side_encryption_configuration" "example" {
+        for_each = var.bucket_acl_map
+        bucket   = each.key
+
+        rule {
+          apply_server_side_encryption_by_default {
+            sse_algorithm     = "aws:kms"
+          }
+        }
+      }
+      ```
+
+      __AWS Console__
+
+      For information on how to enabled S3 access logging via the AWS console see [Enabling Amazon S3 server access logging](https://docs.aws.amazon.com/AmazonS3/latest/userguide/enable-server-access-logging.html) in the AWS documentation.
+
+      __AWS CLI__
+
+      The following example demonstrates how to:
+
+      1. Create a bucket policy to grant the logging service principal permission to `PutObject` in your logging bucket.
+      
+      policy.json
+      ```javascript
+      {
+          "Version": "2012-10-17",
+          "Statement": [
+              {
+                  "Sid": "S3ServerAccessLogsPolicy",
+                  "Effect": "Allow",
+                  "Principal": {"Service": "logging.s3.amazonaws.com"},
+                  "Action": "s3:PutObject",
+                  "Resource": "arn:aws:s3:::MyBucket/Logs/*",
+                  "Condition": {
+                      "ArnLike": {"aws:SourceARN": "arn:aws:s3:::SOURCE-BUCKET-NAME"},
+                      "StringEquals": {"aws:SourceAccount": "SOURCE-AWS-ACCOUNT-ID"}
+                  }
+              }
+          ]
+      }
+      ```
+
+      ```bash
+      aws s3api put-bucket-policy \
+        --bucket my-bucket
+        --policy file://policy.json
+      ```
+
+      2. Apply the policy to your logging bucket
+
+      logging.json
+      ```javascript
+      {
+          "LoggingEnabled": {
+              "TargetBucket": "MyBucket",
+              "TargetPrefix": "Logs/"
+          }
+      }
+      ```
+
+      ```bash
+      aws s3api put-bucket-logging \
+        --bucket MyBucket \
+        --bucket-logging-status file://logging.json
+      ```
+  refs:
+    - title: Logging requests using server access logging
+      url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/ServerLogs.html
+    - title: AWS Documentation - Enabling Amazon S3 server access logging 
+      url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/enable-server-access-logging.html
+    - title: Terraform Registry - aws_s3_bucket
+      url: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket
+    - title: AWS Documentation - AWS CLI Command Reference - put-bucket-logging
+      url: https://awscli.amazonaws.com/v2/documentation/api/latest/reference/s3api/put-bucket-logging.html
+  query: |
+    # @msg Found ${length} S3 buckets where access logging is not enabled:
+    # 
+    # ${{ name arn tags logging }}  
+    aws.s3.buckets.all(
+      logging.length > 0
+    )
+- uid: aws-operational-best-practices-s3-bucket-versioning-enabled
+  title: Checks that versioning is enabled for all buckets
+  severity: 80
+  docs: 
+    desc: |
+      Amazon S3 is a means of keeping multiple variants of an object in the same bucket and can help you to recover more easily from both unintended user actions and application failures.
+    audit: |
+     __Mondoo Shell__
+
+      1. Open a Terminal.
+      2. Connect Mondoo Shell to your AWS environment `mondoo shell -t aws`
+      3. Run the following query 
+      
+         ```mql
+         aws.s3.buckets.where( versioning['Status'] != "Enabled" ) { name arn tags versioning }
+         ```
+
+        Example output
+
+        ```mql
+        aws.s3.buckets.where: [
+          0: {
+            name: "12344375555-my-bucket"
+            arn: "arn:aws:s3:::12344375555-my-bucket"
+            tags: {
+              Environment: "12344375555-mondoo-demo"
+              Name: "12344375555-my-bucket"
+              git_file: "terraform/aws/ec2.tf"
+              git_org: "my-git-org"
+              git_repo: "aws-environment"
+            }
+            versioning: {
+              MFADelete: ""
+              Status: ""
+            }
+          }
+        ]
+        ```
+    remediation: |
+      __Terraform__
+
+      ```hcl
+      resource "aws_s3_bucket" "my_bucket" {
+        bucket = "my-bucket"
+
+        versioning {
+          enabled = true
+        }
+      }
+      ```
+
+      __AWS Console__
+
+      To enable or disable versioning on an S3 bucket
+      
+      1. Sign in to the AWS Management Console and open the Amazon S3 console at https://console.aws.amazon.com/s3/.
+      2. In the Buckets list, choose the name of the bucket that you want to enable versioning for.
+      3. Choose Properties.
+      4. Under Bucket Versioning, choose Edit.
+      5. Choose Suspend or Enable, and then choose Save changes.
+
+      __AWS CLI__
+      
+      ```bash
+      aws s3control put-bucket-versioning \
+      --bucket <bucket_name> \
+      --versioning-configuration Status=Enabled
+      ```
+
+  refs:
+    - title: Using versioning in S3 buckets
+      url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/Versioning.html
+    - title: Terraform Registry - aws_s3_bucket
+      url: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket
+    - title: AWS CLI Command Reference
+      url: https://awscli.amazonaws.com/v2/documentation/api/latest/reference/s3api/put-bucket-versioning.html
+    - title: Enabling versioning on buckets
+      url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/manage-versioning-examples.html
+  query: |
+    # @msg Found ${length} S3 buckets where versioning is not enabled:
+    # 
+    # ${{ name arn tags versioning }}    
+    aws.s3.buckets.all(versioning['Status'] == "Enabled" )
+- uid: aws-operational-best-practices-s3-default-encryption-kms
+  title: Checks that all buckets are encrypted with kms
+  severity: 80
+  docs: 
+    desc: |
+      Checks whether the Amazon S3 buckets are encrypted with AWS Key Management Service (AWS KMS)
+    audit: |
+      __Mondoo Shell__
+
+      1. Open a Terminal.
+      2. Connect Mondoo Shell to your AWS environment `mondoo shell -t aws`
+      3. Run the following query 
+      
+        ```mql
+        aws.s3.buckets.all( 
+          encryption["Rules"].where(
+            _["ApplyServerSideEncryptionByDefault"]["KMSMasterKeyID"] == /^arn:aws:kms:.*/
+          )
+        )
+        ```
+
+        Example output
+
+        ```mql
+        [failed] [].all()
+          actual:   [
+            0: aws.s3.bucket id = arn:aws:s3:::mondoo-test2.policies.test-ui
+          ]
+        ```
+    remediation: |
+      __Terraform__
+
+      ```hcl
+      resource "aws_kms_key" "s3_encryption" {
+        description         = "Used for S3 Bucket encryption configuration"
+        enable_key_rotation = true
+      }
+
+      resource "aws_s3_bucket_server_side_encryption_configuration" "enable" {
+        bucket   = "my-bucket"
+
+        rule {
+          apply_server_side_encryption_by_default {
+            kms_master_key_id = aws_kms_key.s3_encryption.arn
+            sse_algorithm     = "aws:kms"
+          }
+        }
+      }
+
+      ```
+
+      __AWS Console__
+
+      To enable default encryption on an S3 bucket
+
+      1. Open the Amazon S3 console at https://console.aws.amazon.com/s3/.
+      2. In the left navigation pane, choose Buckets.
+      3. Choose the S3 bucket from the list.
+      4. Choose Properties.
+      5. Choose Default encryption.
+      6. For the encryption, choose AWS-KMS.
+      7. Choose AWS-KMS to use keys that are managed by AWS KMS for default encryption. Then choose a master key from the list of the AWS KMS master keys that you have created. For more information on how to create KMS keys, see the [AWS Documentation - Creating Keys](https://docs.aws.amazon.com/kms/latest/developerguide/create-keys.html)
+      8. Type the Amazon Resource Name (ARN) of the AWS KMS key to use. You can find the ARN for your AWS KMS key in the IAM console, under Encryption keys. Or, you can choose a key name from the drop-down list.
+      9. Important: this solution is subject to the RPS (requests per second) quotas of AWS KMS. For more information about AWS KMS quotas and how to request a quota increase, see the [AWS Key Management Service Developer Guide](https://docs.aws.amazon.com/kms/latest/developerguide/limits.html).
+      10. Choose Save.
+
+      For more information about using AWS KMS with Amazon S3, see the [Amazon Simple Storage Service User Guide](https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingKMSEncryption.html).
+
+      When enabling default encryption, you might need to update your bucket policy. For more information about moving from bucket policies to default encryption, see the [Amazon Simple Storage Service User Guide](https://docs.aws.amazon.com/AmazonS3/latest/dev/bucket-encryption.html#bucket-encryption-update-bucket-policy).
+
+      __AWS CLI__
+
+      Create a KMS key
+
+      ```bash
+      aws kms create-key \
+        --description "Key to encrypt S3 buckets"
+      ```
+
+      Enable key rotation
+
+      ```bash
+      aws kms enable-key-rotation \
+        --key-id <key_id_from_previous_command>
+      ```
+
+      Update bucket
+
+      ```bash
+      aws s3api put-bucket-encryption \
+        --bucket my-bucket \
+        --server-side-encryption-configuration '{"Rules": [{"ApplyServerSideEncryptionByDefault": {"KMSMasterKeyID": "<id_from_key>", "SSEAlgorithm": "AES256"}}]}'
+      ```
+  refs:
+  - title: AWS Documentation - KMS - Quotas
+    url: https://docs.aws.amazon.com/kms/latest/developerguide/limits.html
+  - title: AWS Documentation - S3 - Protecting data using server-side encryption with Amazon S3-managed encryption keys (SSE-S3)
+    url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingServerSideEncryption.html
+  - title: AWS Documentation - KMS - Creating keys
+    url: https://docs.aws.amazon.com/kms/latest/developerguide/create-keys.html
+  - title: AWS Documentation - S3 - Setting default server-side encryption behavior for Amazon S3 buckets
+    url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-encryption.html#bucket-encryption-update-bucket-policy
+  - title: Terraform Documentation - aws_s3_bucket_server_side_encryption_configuration
+    url: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_server_side_encryption_configuration
+  query: |
+    # @msg Found ${length} bucket(s) without KMS encryption defined by default.
+    # This control requires that the customer defines a KMS master key in order to encrypt the buckets. 
+    # It fails if buckets are encrypted with another type of key that is not a KMS master key.
+    #
+    # ${{arn name encryption}}
+    aws.s3.buckets.all( 
+      encryption["Rules"].where(
+        _["ApplyServerSideEncryptionByDefault"]["KMSMasterKeyID"] == /^arn:aws:kms:.*/
+      )
+    )
+- uid: aws-operational-best-practices-s3-bucket-server-side-encryption-enabled
+  title: Ensure all S3 buckets employ encryption-at-rest
+  severity: 80
+  docs: 
+    desc: |
+      This control checks that your S3 bucket either has Amazon S3 default encryption enabled or that the S3 bucket policy explicitly denies put-object requests without server-side encryption.
+    audit: |
+      __Mondoo Shell__
+
+      1. Open a Terminal.
+      2. Connect Mondoo Shell to your AWS environment `mondoo shell -t aws`
+      3. Run the following query 
+      
+        ```mql
+        aws.s3.buckets.all(
+          encryption != null &&
+          encryption["Rules"].where(
+            _["ApplyServerSideEncryptionByDefault"]["SSEAlgorithm"] == "aws:kms" || 
+            _["ApplyServerSideEncryptionByDefault"]["SSEAlgorithm"] == "AES256"
+          )
+        )
+        ```
+
+        Example output
+
+        ```mql
+        [failed] [].all()
+          actual:   [
+            0: aws.s3.bucket id = arn:aws:s3:::mondoo-test2.policies.test-ui
+          ]
+        ```
+    remediation: |
+      __Terraform__
+
+      ```hcl
+      resource "aws_s3_bucket_server_side_encryption_configuration" "enable" {
+        bucket = "my-bucket"
+
+        rule {
+          apply_server_side_encryption_by_default {
+            sse_algorithm = "AES256"
+          }
+        }
+      }
+      ```
+
+      __AWS Console__
+
+      To enable default encryption on an S3 bucket
+
+      1. Open the Amazon S3 console at https://console.aws.amazon.com/s3/.
+      2. In the left navigation pane, choose Buckets.
+      3. Choose the S3 bucket from the list.
+      4. Choose Properties.
+      5. Choose Default encryption.
+      6. For the encryption, choose either AES-256 or AWS-KMS.
+      7. Choose AES-256 to use keys that are managed by Amazon S3 for default encryption. For more information about using Amazon S3 server-side encryption to encrypt your data, see the [Amazon Simple Storage Service User Guide](https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingServerSideEncryption.html).
+      8. Choose AWS-KMS to use keys that are managed by AWS KMS for default encryption. Then choose a master key from the list of the AWS KMS master keys that you have created.
+      9. Type the Amazon Resource Name (ARN) of the AWS KMS key to use. You can find the ARN for your AWS KMS key in the IAM console, under Encryption keys. Or, you can choose a key name from the drop-down list.
+      10. Important: if you use the AWS KMS option for your default encryption configuration, you are subject to the RPS (requests per second) quotas of AWS KMS. For more information about AWS KMS quotas and how to request a quota increase, see the [AWS Key Management Service Developer Guide](https://docs.aws.amazon.com/kms/latest/developerguide/limits.html).
+      11. Choose Save.
+
+      For more information about creating an AWS KMS key, see the [AWS Key Management Service Developer Guide](https://docs.aws.amazon.com/kms/latest/developerguide/create-keys.html).
+
+      For more information about using AWS KMS with Amazon S3, see the [Amazon Simple Storage Service User Guide](https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingKMSEncryption.html).
+
+      When enabling default encryption, you might need to update your bucket policy. For more information about moving from bucket policies to default encryption, see the [Amazon Simple Storage Service User Guide](https://docs.aws.amazon.com/AmazonS3/latest/dev/bucket-encryption.html#bucket-encryption-update-bucket-policy).
+
+      __AWS CLI__
+
+      ```bash
+      aws s3api put-bucket-encryption \
+        --bucket my-bucket \
+        --server-side-encryption-configuration '{"Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]}'
+      ```
+  refs:
+  - title: AWS Documentation - Security Hub Standards
+    url: https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-standards-fsbp-controls.html
+  - title: AWS Documentation - KMS - Quotas
+    url: https://docs.aws.amazon.com/kms/latest/developerguide/limits.html
+  - title: AWS Documentation - S3 - Protecting data using server-side encryption with Amazon S3-managed encryption keys (SSE-S3)
+    url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingServerSideEncryption.html
+  - title: AWS Documentation - KMS - Creating keys
+    url: https://docs.aws.amazon.com/kms/latest/developerguide/create-keys.html
+  - title: AWS Documentation - S3 - Setting default server-side encryption behavior for Amazon S3 buckets
+    url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-encryption.html#bucket-encryption-update-bucket-policy
+  - title: Terraform Documentation - aws_s3_bucket_server_side_encryption_configuration
+    url: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_server_side_encryption_configuration
+  query: |
+    # @msg Found ${length} buckets without encryption enabled.
+    # Please notice that this control accepts any encryption configuration, but other controls will require customer defined KMS keys to be compliant.
+    #
+    # ${{arn name encryption}}
+    aws.s3.buckets.all(
+      encryption != null &&
+      encryption["Rules"].where(
+        _["ApplyServerSideEncryptionByDefault"]["SSEAlgorithm"] == "aws:kms" || 
+        _["ApplyServerSideEncryptionByDefault"]["SSEAlgorithm"] == "AES256"
+      )
+    )
+- uid: aws-operational-best-practices-s3-bucket-public-read-prohibited
+  title: Checks that buckets do not allow public read access
+  severity: 95
+  docs: 
+    desc: |
+      This control checks whether your S3 buckets allow public read access. It evaluates the Block Public Access settings, the bucket policy, and the bucket access control list (ACL).
+
+      Some use cases require that everyone on the internet be able to read from your S3 bucket. However, those situations are rare. To ensure the integrity and security of your data, your S3 bucket should not be publicly readable.
+    audit: |
+      __Mondoo Shell__
+
+      1. Open a Terminal.
+      2. Connect Mondoo Shell to your AWS environment `mondoo shell -t aws`
+      3. Run the following query 
+      
+        ```mql
+        aws.s3.buckets.all(
+          aws.s3control.accountPublicAccessBlock != null
+          && aws.s3control.accountPublicAccessBlock.values.all(_ == true)
+          ||
+          publicAccessBlock != null
+          && publicAccessBlock.values.all(_ == true)
+          ||
+          policy != null
+          && policy.statements.none(
+              _["Action"].any(_ == "s3:GetObject")
+              && _["Effect"] == "Allow"
+              && _["Principal"]["AWS"].any(_ == "*")
+          )
+          ||
+          acl.any(
+              permission == "READ" 
+              && grantee["uri"] == "http://acs.amazonaws.com/groups/global/AllUsers"
+              ||
+              permission == "FULL_CONTROL" 
+              && grantee["uri"] == "http://acs.amazonaws.com/groups/global/AllUsers"
+          )   
+        )
+        ```
+
+        Example output
+
+        ```mql
+        [failed] [].all()
+          actual:   [
+            0: aws.s3.bucket id = arn:aws:s3:::mondoo-test2.policies.test-ui
+          ]
+        ```
+    remediation: |
+      __Terraform__
+
+      In order to remediate this control, you should make sure to provide bucket-level public access block.
+      
+      ```hcl
+      resource "aws_s3_bucket_public_access_block" "bucket_level_public_block" {
+        bucket                  = my-bucket
+
+        block_public_acls       = true
+        block_public_policy     = true
+        ignore_public_acls      = true
+        restrict_public_buckets = true
+      }
+      ```
+
+      __AWS Console__
+
+      To remove public access from an S3 bucket
+      
+      1. Open the Amazon S3 console at https://console.aws.amazon.com/s3/.
+      2. In the left navigation pane, choose Buckets.
+      3. Choose the name of the S3 bucket to update.
+      4. Choose Permissions and then choose Block public access.
+      5. Choose Edit.
+      6. Select Block all public access. Then choose Save.
+      7. If prompted, enter confirm and then choose Confirm.
+
+      __AWS CLI__
+
+      ```bash
+      aws s3api put-public-access-block \
+        --bucket my-bucket \
+        --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+      ```
+  refs:
+  - title: AWS Documentation - Security Hub Standards
+    url: https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-standards-fsbp-controls.html
+  - title: AWS Documentation - AWS CLI Command Reference - put-public-access-block
+    url: https://awscli.amazonaws.com/v2/documentation/api/latest/reference/s3api/put-public-access-block.html
+  query: |
+    # @msg Found ${length} buckets with public READ permissions.
+    # This can be caused by public ACLs and/or policies combined with lack of public access block configuration.
+    #
+    # ${{ arn name }}
+    aws.s3.buckets.all(
+      aws.s3control.accountPublicAccessBlock != null
+      && aws.s3control.accountPublicAccessBlock.values.all(_ == true)
+      ||
+      publicAccessBlock != null
+      && publicAccessBlock.values.all(_ == true)
+      ||
+      policy != null
+      && policy.statements.none(
+          _["Action"].any(_ == "s3:GetObject")
+          && _["Effect"] == "Allow"
+          && _["Principal"]["AWS"].any(_ == "*")
+      )
+      ||
+      acl.any(
+          permission == "READ" 
+          && grantee["uri"] == "http://acs.amazonaws.com/groups/global/AllUsers"
+          ||
+          permission == "FULL_CONTROL" 
+          && grantee["uri"] == "http://acs.amazonaws.com/groups/global/AllUsers"
+      )   
+    )
+- uid: aws-operational-best-practices-s3-bucket-public-write-prohibited
+  title: Checks that buckets do not allow public write access
+  severity: 95
+  docs: 
+    desc: |
+      This control checks whether your S3 buckets allow public write access. It evaluates the block public access settings, the bucket policy, and the bucket access control list (ACL).
+
+      Some use cases require that everyone on the internet be able to write to your S3 bucket. However, those situations are rare. To ensure the integrity and security of your data, your S3 bucket should not be publicly writable.
+    audit: |
+      __Mondoo Shell__
+
+      1. Open a Terminal.
+      2. Connect Mondoo Shell to your AWS environment `mondoo shell -t aws`
+      3. Run the following query 
+      
+        ```mql
+        aws.s3.buckets.all(
+            aws.s3control.accountPublicAccessBlock != null
+            && aws.s3control.accountPublicAccessBlock.values.all(_ == true)
+            ||
+            publicAccessBlock != null
+            && publicAccessBlock.values.all(_ == true)
+            ||
+            policy != null
+            && policy.statements.none(
+                _["Action"].any(_ == "s3:PutObject")
+                && _["Effect"] == "Allow"
+                && _["Principal"]["AWS"].any(_ == "*")
+            )
+            ||
+            acl.any(
+                permission == "WRITE" 
+                && grantee["uri"] == "http://acs.amazonaws.com/groups/global/AllUsers"
+                ||
+                permission == "FULL_CONTROL" 
+                && grantee["uri"] == "http://acs.amazonaws.com/groups/global/AllUsers"
+            )   
+        )
+        ```
+
+        Example output
+
+        ```mql
+        [failed] [].all()
+          actual:   [
+            0: aws.s3.bucket id = arn:aws:s3:::mondoo-test2.policies.test-ui
+          ]
+        ```
+    remediation: |
+      __Terraform__
+
+      In order to remediate this control, you should make sure to provide bucket-level public access block.
+      
+      ```hcl
+      resource "aws_s3_bucket_public_access_block" "bucket_level_public_block" {
+        bucket                  = my-bucket
+
+        block_public_acls       = true
+        block_public_policy     = true
+        ignore_public_acls      = true
+        restrict_public_buckets = true
+      }
+      ```
+
+      __AWS Console__
+
+      To remove public access from an S3 bucket
+      
+      1. Open the Amazon S3 console at https://console.aws.amazon.com/s3/.
+      2. In the left navigation pane, choose Buckets.
+      3. Choose the name of the S3 bucket to update.
+      4. Choose Permissions and then choose Block public access.
+      5. Choose Edit.
+      6. Select Block all public access. Then choose Save.
+      7. If prompted, enter confirm and then choose Confirm.
+
+      __AWS CLI__
+
+      ```bash
+      aws s3api put-public-access-block \
+        --bucket my-bucket \
+        --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+      ```
+  refs:
+  - title: AWS Documentation - Security Hub Standards
+    url: https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-standards-fsbp-controls.html
+  - title: AWS Documentation - AWS CLI Command Reference - put-public-access-block
+    url: https://awscli.amazonaws.com/v2/documentation/api/latest/reference/s3api/put-public-access-block.html
+  query: |
+    # @msg Found ${length} buckets with public WRITE permissions.
+    # This can be caused by public ACLs and/or policies combined with lack of public access block configuration.
+    #
+    # ${{ arn name }}
+    aws.s3.buckets.all(
+        aws.s3control.accountPublicAccessBlock != null
+        && aws.s3control.accountPublicAccessBlock.values.all(_ == true)
+        ||
+        publicAccessBlock != null
+        && publicAccessBlock.values.all(_ == true)
+        ||
+        policy != null
+        && policy.statements.none(
+            _["Action"].any(_ == "s3:PutObject")
+            && _["Effect"] == "Allow"
+            && _["Principal"]["AWS"].any(_ == "*")
+        )
+        ||
+        acl.any(
+            permission == "WRITE" 
+            && grantee["uri"] == "http://acs.amazonaws.com/groups/global/AllUsers"
+            ||
+            permission == "FULL_CONTROL" 
+            && grantee["uri"] == "http://acs.amazonaws.com/groups/global/AllUsers"
+        )   
+    ) 

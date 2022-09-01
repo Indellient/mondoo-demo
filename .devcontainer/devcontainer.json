@@ -1,0 +1,41 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the README at:
+// https://github.com/microsoft/vscode-dev-containers/tree/v0.231.6/containers/ubuntu
+{
+	"name": "Mondoo DevContainer",
+	"build": {
+		"dockerfile": "Dockerfile",
+		// Update 'VARIANT' to pick an Ubuntu version: hirsute, focal, bionic
+		// Use hirsute or bionic on local arm64/Apple Silicon.
+		"args": {
+			"VARIANT": "jammy"
+		}
+	},
+	// Sets the environment
+	"runArgs": [
+		"--env-file",
+		".devcontainer/credentials/.env"
+	],
+	// Set *default* container specific settings.json values on container create.
+	"settings": {
+		"[terraform]": {
+			"editor.defaultFormatter": "hashicorp.terraform",
+			"editor.formatOnSave": true,
+			"editor.formatOnSaveMode": "file"
+		},
+		"[terraform-vars]": {
+			"editor.defaultFormatter": "hashicorp.terraform",
+			"editor.formatOnSave": true,
+			"editor.formatOnSaveMode": "file"
+		}
+	},
+	// Add the IDs of extensions you want installed when the container is created.
+	"extensions": [
+		"amazonwebservices.aws-toolkit-vscode",
+		"HashiCorp.terraform",
+		"golang.Go"
+	],
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+	// Use 'postCreateCommand' to run commands after the container is created.
+	"postCreateCommand": "bash -c \"$(curl -sSL https://install.mondoo.com/sh)\""
+}
