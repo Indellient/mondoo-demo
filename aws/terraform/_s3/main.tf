@@ -12,8 +12,8 @@ resource "aws_s3_bucket" "all" {
   bucket        = each.key
   force_destroy = true
   tags = {
-    "Mondoo" = "Compliant"
-    "Pwd"    = "s3"
+    "Mondoo"   = "Non-compliant"
+    "TFModule" = "_s3"
   }
 }
 
