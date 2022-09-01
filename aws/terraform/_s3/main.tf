@@ -4,7 +4,7 @@ variable "bucket_acl_map" {
   type = map(any)
   default = {
     "mondoo.indellient.logging"        = "log-delivery-write"
-    "mondoo.indellient.tfstate"        = "private"
+    "mondoo.indellient.sample"         = "private"
     "mondoo.indellient.s3-data-events" = "private"
   }
 }
