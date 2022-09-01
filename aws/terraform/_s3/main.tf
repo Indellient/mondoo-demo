@@ -3,15 +3,9 @@ data "aws_caller_identity" "current" {}
 variable "bucket_acl_map" {
   type = map(any)
   default = {
-    "mondoo.indellient.logging"        = "log-delivery-write"
-    "mondoo.indellient.sample"         = "private"
-    "mondoo.indellient.s3-data-events" = "private"
+    "mondoo.indellient.logging" = "log-delivery-write"
+    "mondoo.indellient.sample"  = "private"
   }
-}
-
-variable "s3_data_events_key_prefix" {
-  type    = string
-  default = "data-events"
 }
 
 resource "aws_s3_bucket" "all" {
@@ -76,57 +70,4 @@ resource "aws_s3_account_public_access_block" "enable" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
-}
-
-resource "aws_s3_bucket_policy" "s3_data_events" {
-  bucket = aws_s3_bucket.all["mondoo.indellient.s3-data-events"].id
-  policy = <<POLICY
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Sid": "AWSCloudTrailAclCheck",
-            "Effect": "Allow",
-            "Principal": {
-              "Service": "cloudtrail.amazonaws.com"
-            },
-            "Action": "s3:GetBucketAcl",
-            "Resource": "${aws_s3_bucket.all["mondoo.indellient.s3-data-events"].arn}"
-        },
-        {
-            "Sid": "AWSCloudTrailWrite",
-            "Effect": "Allow",
-            "Principal": {
-              "Service": "cloudtrail.amazonaws.com"
-            },
-            "Action": "s3:PutObject",
-            "Resource": "${aws_s3_bucket.all["mondoo.indellient.s3-data-events"].arn}/${var.s3_data_events_key_prefix}/AWSLogs/${data.aws_caller_identity.current.account_id}/*",
-            "Condition": {
-                "StringEquals": {
-                    "s3:x-amz-acl": "bucket-owner-full-control"
-                }
-            }
-        }
-    ]
-}
-POLICY
-}
-
-resource "aws_cloudtrail" "s3_data_events" {
-  name                          = "s3-data-events"
-  s3_bucket_name                = aws_s3_bucket.all["mondoo.indellient.s3-data-events"].id
-  s3_key_prefix                 = var.s3_data_events_key_prefix
-  include_global_service_events = true
-  is_multi_region_trail         = true
-  enable_log_file_validation    = true
-  enable_logging                = true
-  event_selector {
-    read_write_type           = "All"
-    include_management_events = false
-
-    data_resource {
-      type   = "AWS::S3::Object"
-      values = ["arn:aws:s3"]
-    }
-  }
 }
