@@ -3,7 +3,7 @@ data "aws_caller_identity" "current" {}
 variable "bucket_acl_map" {
   type = map(any)
   default = {
-    "mondoo.indellient.tfstate" = "private"
+    "mondoo.indellient.sample" = "private"
   }
 }
 
