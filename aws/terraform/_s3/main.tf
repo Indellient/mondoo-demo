@@ -23,7 +23,9 @@ resource "aws_s3_bucket_acl" "all" {
   acl      = each.value
 }
 
-resource "aws_s3_account_public_access_block" "enable" {
+resource "aws_s3_bucket_public_access_block" "all" {
+  for_each                = var.bucket_acl_map
+  bucket                  = each.key
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
