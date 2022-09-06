@@ -32,7 +32,8 @@
 	"extensions": [
 		"amazonwebservices.aws-toolkit-vscode",
 		"HashiCorp.terraform",
-		"golang.Go"
+		"golang.Go",
+		"eamodio.gitlens"
 	],
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],

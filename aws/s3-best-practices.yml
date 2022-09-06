@@ -101,7 +101,6 @@ queries:
       --account-id <value> \
       --public-access-block-configuration '{"BlockPublicAcls": true, "BlockPublicPolicy": true, "IgnorePublicAcls": true, "RestrictPublicBuckets": true}'
       ```
-
   refs:
     - title: Blocking public access to your Amazon S3 storage
       url: https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html
